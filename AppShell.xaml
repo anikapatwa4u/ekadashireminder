@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="EkadashiReminder.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:pages="clr-namespace:EkadashiReminder.Pages"
+    Shell.TabBarBackgroundColor="{AppThemeBinding Light=White, Dark=#16213E}"
+    Shell.TabBarForegroundColor="#E65100"
+    Shell.TabBarUnselectedColor="{AppThemeBinding Light=#999, Dark=#666}"
+    Shell.TabBarTitleColor="#E65100"
+    Title="EkadashiReminder">
+
+    <TabBar>
+        <ShellContent
+            Title="Calendar"
+            Icon="calendar_icon.png"
+            ContentTemplate="{DataTemplate pages:CalendarPage}"
+            Route="CalendarPage" />
+
+        <ShellContent
+            Title="My Reminders"
+            Icon="reminder_icon.png"
+            ContentTemplate="{DataTemplate pages:RemindersPage}"
+            Route="RemindersPage" />
+    </TabBar>
+
+</Shell>
+

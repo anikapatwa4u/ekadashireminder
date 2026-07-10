@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="EkadashiReminder.Pages.CalendarPage_new"
+             Title="CalendarPage_new">
+    <VerticalStackLayout Spacing="25" Padding="30,0" xmlns:local="clr-namespace:EkadashiReminder">
+        <Image Source="calendar.png"
+               HeightRequest="150"
+               HorizontalOptions="Center" />
+
+        <Label Text="Ekadashi Reminder"
+               HorizontalOptions="Center"
+               FontAttributes="Bold"
+               FontSize="32"
+               TextColor="#0078D4" />
+
+        <Frame BorderColor="#0078D4"
+               BackgroundColor="Transparent"
+               CornerRadius="10"
+               HasShadow="True">
+            <VerticalStackLayout Padding="20"
+                                 Spacing="15">
+                <Label Text="Ekadashi Dates"
+                       FontAttributes="Bold"
+                       FontSize="24"
+                       TextColor="#0078D4" />
+
+                <CollectionView x:Name="EkadashiDatesCollectionView"
+                                IsVisible="False">
+                    <CollectionView.Header>
+                        <Label Text="Upcoming Ekadashi Dates"
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"
+                               TextColor="#0078D4" />
+                    </CollectionView.Header>
+
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <SwipeView>
+                                <SwipeView.RightItems>
+                                    <SwipeItems>
+                                        <SwipeItem Text="Delete"
+                                                   BackgroundColor="Red"
+                                                   Command="{Binding Source={x:Reference EkadashiDatesCollectionView}, Path=BindingContext.DeleteEkadashiCommand}"
+                                                   CommandParameter="{Binding .}" />
+                                    </SwipeItems>
+                                </SwipeView.RightItems>
+
+                                <VerticalStackLayout>
+                                    <Grid Padding="10"
+                                          Margin="0,5"
+                                          BackgroundColor="White"
+                                          RowSpacing="0"
+                                          ColumnDefinitions="Auto,*">
+                                        <Label Text="{Binding Date}"
+                                               FontSize="18"
+                                               VerticalOptions="Center"
+                                               TextColor="#333333" />
+
+                                        <Label Text="{Binding Occasion}"
+                                               FontSize="18"
+                                               VerticalOptions="Center"
+                                               TextColor="#333333"
+                                               Grid.Column="1" />
+
+                                        <ImageButton Source="delete.png"
+                                                     HeightRequest="24"
+                                                     HorizontalOptions="End"
+                                                     Command="{Binding Source={x:Reference EkadashiDatesCollectionView}, Path=BindingContext.DeleteEkadashiCommand}"
+                                                     CommandParameter="{Binding .}" />
+                                    </Grid>
+
+                                    <Frame BorderColor="#0078D4"
+                                           BackgroundColor="Transparent"
+                                           CornerRadius="10"
+                                           Padding="10"
+                                           HasShadow="False">
+                                        <Label Text="{Binding Reminder}"
+                                               FontSize="16"
+                                               TextColor="#0078D4" />
+                                    </Frame>
+                                </VerticalStackLayout>
+                            </SwipeView>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <Button Text="Add Ekadashi Date"
+                        TextColor="White"
+                        BackgroundColor="#0078D4"
+                        FontAttributes="Bold"
+                        Command="{Binding Source={x:Reference EkadashiDatesCollectionView}, Path=BindingContext.AddEkadashiCommand}"
+                        CornerRadius="10"
+                        HeightRequest="50" />
+            </VerticalStackLayout>
+        </Frame>
+
+        <Label Text="Fast Break: 08:37 &#x2013; 11:04"
+               FontAttributes="Italic"
+               FontSize="18"
+               TextColor="#333333"
+               HorizontalOptions="Center" />
+    </VerticalStackLayout>
+</ContentPage>

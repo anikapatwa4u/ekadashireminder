@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+             x:Class="EkadashiReminder.Pages.AddReminderPage"
+             Title="Add Custom Reminder"
+             BackgroundColor="{AppThemeBinding Light=#FFF8F0, Dark=#1A1A2E}">
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="16" Padding="20">
+
+            <Label Text="Custom Reminder"
+                   FontSize="24"
+                   FontAttributes="Bold"
+                   TextColor="{AppThemeBinding Light=#E65100, Dark=#FF7043}"
+                   Margin="0,8,0,0" />
+
+            <Label Text="Add a personal reminder for a special date. You'll receive a notification one day before."
+                   FontSize="14"
+                   TextColor="{AppThemeBinding Light=#666, Dark=#AAA}" />
+
+            <!-- Name Field -->
+            <VerticalStackLayout Spacing="6">
+                <Label Text="Reminder Name *"
+                       FontSize="14"
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light=#333, Dark=#CCC}" />
+                <Border BackgroundColor="{AppThemeBinding Light=White, Dark=#16213E}"
+                        StrokeShape="RoundRectangle 10"
+                        StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light=#DDD, Dark=#333}"
+                        Padding="12,4">
+                    <Entry x:Name="NameEntry"
+                           Placeholder="e.g. Ekadashi Vrata, Janmashtami Fast"
+                           Text="{Binding Name}"
+                           FontSize="15"
+                           ReturnType="Next"
+                           BackgroundColor="Transparent" />
+                </Border>
+            </VerticalStackLayout>
+
+            <!-- Date Picker -->
+            <VerticalStackLayout Spacing="6">
+                <Label Text="Date *"
+                       FontSize="14"
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light=#333, Dark=#CCC}" />
+                <Border BackgroundColor="{AppThemeBinding Light=White, Dark=#16213E}"
+                        StrokeShape="RoundRectangle 10"
+                        StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light=#DDD, Dark=#333}"
+                        Padding="12,4">
+                    <DatePicker Date="{Binding Date}"
+                                Format="dddd, MMMM d, yyyy"
+                                MinimumDate="{x:Static sys:DateTime.Today}"
+                                FontSize="15"
+                                BackgroundColor="Transparent" />
+                </Border>
+            </VerticalStackLayout>
+
+            <!-- Notes Field -->
+            <VerticalStackLayout Spacing="6">
+                <Label Text="Notes (optional)"
+                       FontSize="14"
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light=#333, Dark=#CCC}" />
+                <Border BackgroundColor="{AppThemeBinding Light=White, Dark=#16213E}"
+                        StrokeShape="RoundRectangle 10"
+                        StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light=#DDD, Dark=#333}"
+                        Padding="12,4">
+                    <Editor Text="{Binding Notes}"
+                            Placeholder="Any special notes..."
+                            AutoSize="TextChanges"
+                            MinimumHeightRequest="80"
+                            FontSize="15"
+                            BackgroundColor="Transparent" />
+                </Border>
+            </VerticalStackLayout>
+
+            <!-- Info Box -->
+            <Border BackgroundColor="#FFF3E0"
+                    StrokeShape="RoundRectangle 10"
+                    StrokeThickness="0"
+                    Padding="14">
+                <HorizontalStackLayout Spacing="10">
+                    <Label Text="??" FontSize="20" VerticalOptions="Center" />
+                    <Label Text="You will receive a reminder notification one day before this date."
+                           FontSize="13"
+                           TextColor="#E65100"
+                           VerticalOptions="Center" />
+                </HorizontalStackLayout>
+            </Border>
+
+            <!-- Buttons -->
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,8,0,0">
+                <Button Grid.Column="0"
+                        Text="Cancel"
+                        Clicked="OnCancelClicked"
+                        BackgroundColor="{AppThemeBinding Light=#EEE, Dark=#333}"
+                        TextColor="{AppThemeBinding Light=#333, Dark=#CCC}"
+                        CornerRadius="10"
+                        HeightRequest="50" />
+                <Button Grid.Column="1"
+                        Text="Save Reminder"
+                        Clicked="OnSaveClicked"
+                        IsEnabled="{Binding CanSave}"
+                        BackgroundColor="#E65100"
+                        TextColor="White"
+                        FontAttributes="Bold"
+                        CornerRadius="10"
+                        HeightRequest="50" />
+            </Grid>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

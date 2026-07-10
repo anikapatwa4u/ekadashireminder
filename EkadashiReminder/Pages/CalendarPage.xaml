@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:EkadashiReminder.ViewModels"
+             xmlns:models="clr-namespace:EkadashiReminder.Models"
+             x:Class="EkadashiReminder.Pages.CalendarPage"
+             x:Name="ThisPage"
+             Title="Ekadashi Calendar"
+             BackgroundColor="{AppThemeBinding Light=#FFF8F0, Dark=#1A1A2E}">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <Style x:Key="CardStyle" TargetType="Border">
+                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=White, Dark=#16213E}" />
+                <Setter Property="StrokeShape" Value="RoundRectangle 12" />
+                <Setter Property="StrokeThickness" Value="0" />
+                <Setter Property="Padding" Value="16" />
+                <Setter Property="Shadow">
+                    <Shadow Brush="#20000000" Offset="0,2" Radius="8" Opacity="0.15" />
+                </Setter>
+            </Style>
+            <Style x:Key="PickerLabelStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="CharacterSpacing" Value="1.2" />
+                <Setter Property="TextColor" Value="{AppThemeBinding Light=#888, Dark=#777}" />
+                <Setter Property="Margin" Value="0,0,0,4" />
+            </Style>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- Header -->
+        <Border Grid.Row="0" BackgroundColor="#E65100" Padding="20,14">
+            <VerticalStackLayout Spacing="4">
+                <Label Text="&#x1F554; Ekadashi Reminder"
+                       FontSize="22" FontAttributes="Bold"
+                       TextColor="White" HorizontalOptions="Center" />
+                <Label Text="Vaishnava Fasting Calendar"
+                       FontSize="13" TextColor="#FFCCBC" HorizontalOptions="Center" />
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Scrollable body -->
+        <RefreshView Grid.Row="1"
+                     Command="{Binding RefreshCommand}"
+                     IsRefreshing="{Binding IsBusy}">
+            <ScrollView>
+                <VerticalStackLayout Spacing="0">
+
+                    <!-- Location picker card -->
+                    <Border Style="{StaticResource CardStyle}" Margin="16,14,16,0">
+                        <VerticalStackLayout Spacing="10">
+
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                <Label Grid.Column="0" Text="&#x1F4CD;" FontSize="18" VerticalOptions="Center" />
+                                <Label Grid.Column="1"
+                                       Text="Your Location"
+                                       FontSize="15" FontAttributes="Bold"
+                                       TextColor="{AppThemeBinding Light=#1A1A2E, Dark=White}"
+                                       VerticalOptions="Center" />
+                            </Grid>
+
+                            <!-- Country picker -->
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="COUNTRY" Style="{StaticResource PickerLabelStyle}" />
+                                <Border BackgroundColor="{AppThemeBinding Light=#F9F9F9, Dark=#0F172A}"
+                                        StrokeShape="RoundRectangle 8"
+                                        StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light=#E0E0E0, Dark=#2D2D4E}"
+                                        Padding="4,0">
+                                    <Picker ItemsSource="{Binding Countries}"
+                                            SelectedItem="{Binding SelectedCountry}"
+                                            Title="Select country"
+                                            FontSize="14"
+                                            BackgroundColor="Transparent" />
+                                </Border>
+                            </VerticalStackLayout>
+
+                            <!-- City picker -->
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="NEAREST MAJOR CITY" Style="{StaticResource PickerLabelStyle}" />
+                                <Border BackgroundColor="{AppThemeBinding Light=#F9F9F9, Dark=#0F172A}"
+                                        StrokeShape="RoundRectangle 8"
+                                        StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light=#E0E0E0, Dark=#2D2D4E}"
+                                        Padding="4,0">
+                                    <Picker ItemsSource="{Binding CitiesForCountry}"
+                                            SelectedItem="{Binding SelectedLocation}"
+                                            ItemDisplayBinding="{Binding City}"
+                                            Title="Select nearest major city"
+                                            FontSize="14"
+                                            BackgroundColor="Transparent" />
+                                </Border>
+                                <Label Text="Tip: Pick the major city closest to you — fasting &amp; Paaran times are calculated for that location."
+                                       FontSize="11"
+                                       TextColor="{AppThemeBinding Light=#999, Dark=#777}"
+                                       Margin="2,2,0,0" />
+                            </VerticalStackLayout>
+
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Section heading -->
+                    <Label Text="UPCOMING EKADASHIS"
+                           FontSize="11" FontAttributes="Bold" CharacterSpacing="1.8"
+                           TextColor="{AppThemeBinding Light=#E65100, Dark=#FF7043}"
+                           Margin="20,18,16,8" />
+
+                    <!-- Loading panel -->
+                    <VerticalStackLayout IsVisible="{Binding IsBusy}"
+                                         HorizontalOptions="Center"
+                                         Spacing="12"
+                                         Padding="0,36,0,24">
+                        <ActivityIndicator IsRunning="{Binding IsBusy}"
+                                           Color="#E65100"
+                                           WidthRequest="44" HeightRequest="44"
+                                           HorizontalOptions="Center" />
+                        <Label Text="Loading Ekadashi dates…"
+                               FontSize="14"
+                               TextColor="{AppThemeBinding Light=#888, Dark=#AAA}"
+                               HorizontalOptions="Center" />
+                    </VerticalStackLayout>
+
+                    <!-- Error panel -->
+                    <Border IsVisible="{Binding HasError}"
+                            Style="{StaticResource CardStyle}"
+                            Margin="16,12,16,0">
+                        <VerticalStackLayout Spacing="10" Padding="8,12" HorizontalOptions="Center">
+                            <Label Text="&#x26A0;&#xFE0F;" FontSize="40" HorizontalOptions="Center" />
+                            <Label Text="Couldn't load the calendar"
+                                   FontSize="16" FontAttributes="Bold"
+                                   TextColor="{AppThemeBinding Light=#1A1A2E, Dark=White}"
+                                   HorizontalOptions="Center" />
+                            <Label Text="Something went wrong while loading dates for this city. Please refresh to try again."
+                                   FontSize="13"
+                                   TextColor="{AppThemeBinding Light=#777, Dark=#AAA}"
+                                   HorizontalTextAlignment="Center" />
+                            <Button Text="&#x21BB;  Refresh"
+                                    Command="{Binding RefreshCommand}"
+                                    BackgroundColor="#E65100"
+                                    TextColor="White"
+                                    FontAttributes="Bold"
+                                    CornerRadius="8"
+                                    Margin="0,4,0,0"
+                                    HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Next 4 cards -->
+                    <CollectionView x:Name="NextFourView"
+                                    ItemsSource="{Binding NextFourEvents}"
+                                    IsVisible="{Binding ShowContent}"
+                                    HeightRequest="480"
+                                    Margin="16,0">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:EkadashiEvent">
+                                <Border Margin="0,0,0,10"
+                                        StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 14"
+                                        Padding="0">
+                                    <Border.Shadow>
+                                        <Shadow Brush="#20000000" Offset="0,3" Radius="10" Opacity="0.2" />
+                                    </Border.Shadow>
+                                    <Grid ColumnDefinitions="6,*,Auto"
+                                          ColumnSpacing="0"
+                                          BackgroundColor="{AppThemeBinding Light=White, Dark=#16213E}">
+
+                                        <BoxView Grid.Column="0"
+                                                 Color="{Binding IsCustom, Converter={x:StaticResource CustomColorConverter}}"
+                                                 VerticalOptions="Fill" />
+
+                                        <VerticalStackLayout Grid.Column="1" Spacing="4" Padding="14,12">
+                                            <Label Text="{Binding Name}"
+                                                   FontSize="17" FontAttributes="Bold"
+                                                   TextColor="{AppThemeBinding Light=#1A1A2E, Dark=White}" />
+                                            <Label Text="{Binding Date, StringFormat='{0:dddd, MMMM d, yyyy}'}"
+                                                   FontSize="13"
+                                                   TextColor="{AppThemeBinding Light=#555, Dark=#AAA}" />
+                                            <!-- Break-fast window (only shown when data is available) -->
+                                            <Label Text="{Binding BreakFastLabel}"
+                                                   FontSize="12"
+                                                   TextColor="{AppThemeBinding Light=#E65100, Dark=#FF7043}"
+                                                   IsVisible="{Binding HasBreakFastTime}"
+                                                   FontAttributes="Bold" />
+                                            <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8" Margin="0,2,0,0">
+                                                <Border Grid.Column="0"
+                                                        BackgroundColor="{Binding DaysUntil, Converter={x:StaticResource DaysColorConverter}}"
+                                                        StrokeShape="RoundRectangle 20"
+                                                        StrokeThickness="0" Padding="10,4">
+                                                    <Label Text="{Binding DaysUntilLabel}"
+                                                           FontSize="12" FontAttributes="Bold" TextColor="White" />
+                                                </Border>
+                                                <Border Grid.Column="1"
+                                                        BackgroundColor="#FBE9E7"
+                                                        StrokeShape="RoundRectangle 20"
+                                                        StrokeThickness="0" Padding="10,4"
+                                                        IsVisible="{Binding IsCustom}">
+                                                    <Label Text="Custom" FontSize="12" TextColor="#E65100" />
+                                                </Border>
+                                            </Grid>
+                                        </VerticalStackLayout>
+
+                                        <!-- Bell toggle -->
+                                        <VerticalStackLayout Grid.Column="2"
+                                                             VerticalOptions="Center"
+                                                             HorizontalOptions="Center"
+                                                             Padding="10,0,14,0"
+                                                             Spacing="2">
+                                            <Button Text="{Binding ReminderIcon}"
+                                                    FontSize="22"
+                                                    BackgroundColor="Transparent"
+                                                    Padding="0" HeightRequest="44" WidthRequest="44"
+                                                    CommandParameter="{Binding .}"
+                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.ToggleReminderCommand}" />
+                                            <Label Text="{Binding ReminderEnabled, Converter={x:StaticResource ReminderStatusLabelConverter}}"
+                                                   FontSize="10" HorizontalOptions="Center"
+                                                   TextColor="{Binding ReminderEnabled, Converter={x:StaticResource ReminderStatusColorConverter}}" />
+                                        </VerticalStackLayout>
+
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+
+                        <CollectionView.EmptyView>
+                            <VerticalStackLayout HorizontalOptions="Center" Spacing="8" Padding="40,24">
+                                <Label Text="&#x1F64F;" FontSize="44" HorizontalOptions="Center" />
+                                <Label Text="No upcoming Ekadashi dates found."
+                                       FontSize="15" HorizontalOptions="Center"
+                                       TextColor="{AppThemeBinding Light=#888, Dark=#555}"
+                                       HorizontalTextAlignment="Center" />
+                            </VerticalStackLayout>
+                        </CollectionView.EmptyView>
+                    </CollectionView>
+
+                    <!-- All upcoming dates (collapsible) -->
+                    <Border Style="{StaticResource CardStyle}"
+                            Margin="16,4,16,0"
+                            IsVisible="{Binding ShowContent}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0"
+                                   Text="ALL UPCOMING DATES"
+                                   FontSize="11" FontAttributes="Bold" CharacterSpacing="1.5"
+                                   TextColor="{AppThemeBinding Light=#E65100, Dark=#FF7043}"
+                                   VerticalOptions="Center" />
+                            <Button Grid.Column="1"
+                                    x:Name="ToggleAllBtn"
+                                    Text="Show &#x25BE;"
+                                    FontSize="13"
+                                    BackgroundColor="Transparent"
+                                    TextColor="#E65100"
+                                    Padding="4,0"
+                                    Clicked="OnToggleAllDatesClicked" />
+                        </Grid>
+                    </Border>
+
+                    <CollectionView x:Name="AllUpcomingView"
+                                    ItemsSource="{Binding UpcomingEvents}"
+                                    IsVisible="False"
+                                    Margin="16,4,16,0">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:EkadashiEvent">
+                                <Grid ColumnDefinitions="*,Auto" Padding="4,7" ColumnSpacing="8">
+                                    <VerticalStackLayout Grid.Column="0" Spacing="1">
+                                        <Label Text="{Binding Name}"
+                                               FontSize="14" FontAttributes="Bold"
+                                               TextColor="{AppThemeBinding Light=#1A1A2E, Dark=White}" />
+                                        <Label Text="{Binding Date, StringFormat='{0:MMM d, yyyy  ddd}'}"
+                                               FontSize="12"
+                                               TextColor="{AppThemeBinding Light=#777, Dark=#AAA}" />
+                                    </VerticalStackLayout>
+                                    <Label Grid.Column="1"
+                                           Text="{Binding DaysUntilLabel}"
+                                           FontSize="12" FontAttributes="Bold"
+                                           TextColor="{Binding DaysUntil, Converter={x:StaticResource DaysColorConverter}}"
+                                           VerticalOptions="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <BoxView HeightRequest="28" Color="Transparent" />
+
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+
+    </Grid>
+</ContentPage>

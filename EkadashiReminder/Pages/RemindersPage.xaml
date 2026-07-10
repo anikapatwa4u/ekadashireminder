@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:EkadashiReminder.Models"
+             x:Class="EkadashiReminder.Pages.RemindersPage"
+             Title="My Reminders"
+             BackgroundColor="{AppThemeBinding Light=#FFF8F0, Dark=#1A1A2E}">
+
+    <Grid RowDefinitions="*,Auto">
+
+        <CollectionView x:Name="RemindersList"
+                        ItemsSource="{Binding Reminders}"
+                        Grid.Row="0"
+                        Margin="16">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:CustomReminder">
+                    <Border BackgroundColor="{AppThemeBinding Light=White, Dark=#16213E}"
+                            StrokeShape="RoundRectangle 12"
+                            StrokeThickness="0"
+                            Padding="16"
+                            Margin="0,0,0,10">
+                        <Border.Shadow>
+                            <Shadow Brush="#20000000" Offset="0,2" Radius="8" Opacity="0.15" />
+                        </Border.Shadow>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <VerticalStackLayout Grid.Column="0" Spacing="4">
+                                <Label Text="{Binding Name}"
+                                       FontSize="16"
+                                       FontAttributes="Bold"
+                                       TextColor="{AppThemeBinding Light=#1A1A2E, Dark=White}" />
+                                <Label Text="{Binding Date, StringFormat='{0:dddd, MMMM d, yyyy}'}"
+                                       FontSize="13"
+                                       TextColor="{AppThemeBinding Light=#666, Dark=#AAA}" />
+                                <Label Text="{Binding Notes}"
+                                       FontSize="13"
+                                       TextColor="{AppThemeBinding Light=#999, Dark=#777}"
+                                       IsVisible="{Binding Notes, Converter={x:StaticResource NotNullOrEmptyConverter}}" />
+                            </VerticalStackLayout>
+                            <Button Grid.Column="1"
+                                    Text="??"
+                                    FontSize="18"
+                                    BackgroundColor="Transparent"
+                                    TextColor="#E65100"
+                                    Clicked="OnDeleteClicked"
+                                    CommandParameter="{Binding Id}"
+                                    VerticalOptions="Center"
+                                    Padding="4" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+
+            <CollectionView.EmptyView>
+                <VerticalStackLayout HorizontalOptions="Center"
+                                     VerticalOptions="Center"
+                                     Spacing="12"
+                                     Padding="40">
+                    <Label Text="??" FontSize="48" HorizontalOptions="Center" />
+                    <Label Text="No custom reminders yet."
+                           FontSize="16"
+                           HorizontalOptions="Center"
+                           TextColor="{AppThemeBinding Light=#888, Dark=#555}"
+                           HorizontalTextAlignment="Center" />
+                    <Label Text="Tap the button below to add your first reminder."
+                           FontSize="14"
+                           HorizontalOptions="Center"
+                           TextColor="{AppThemeBinding Light=#AAA, Dark=#444}"
+                           HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+            </CollectionView.EmptyView>
+        </CollectionView>
+
+        <!-- Add Button -->
+        <Button Grid.Row="1"
+                Text="?  Add Custom Reminder"
+                Clicked="OnAddReminderClicked"
+                BackgroundColor="#E65100"
+                TextColor="White"
+                FontAttributes="Bold"
+                FontSize="16"
+                CornerRadius="12"
+                HeightRequest="54"
+                Margin="16,8,16,20" />
+    </Grid>
+</ContentPage>
