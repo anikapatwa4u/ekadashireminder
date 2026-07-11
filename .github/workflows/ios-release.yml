@@ -80,35 +80,6 @@ jobs:
           mkdir -p "$PROFILE_DIR"
           echo "$PROFILE_BASE64" | base64 --decode > "$PROFILE_DIR/profile.mobileprovision"
 
-      - name: Diagnose signing identity vs provisioning profile
-        run: |
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          echo "===== Certificates in keychain ====="
-          security find-identity -p codesigning -v "$KEYCHAIN_PATH"
-
-          echo ""
-          echo "===== Provisioning profile details ====="
-          PROFILE="$HOME/Library/MobileDevice/Provisioning Profiles/profile.mobileprovision"
-          security cms -D -i "$PROFILE" > /tmp/profile.plist 2>/dev/null
-
-          echo "--- Profile Name ---"
-          /usr/libexec/PlistBuddy -c "Print :Name" /tmp/profile.plist
-
-          echo "--- App ID (entitlements application-identifier) ---"
-          /usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/profile.plist 2>/dev/null || true
-
-          echo "--- Certificate(s) the profile trusts (SHA-1) ---"
-          # Extract each DeveloperCertificate and print its fingerprint
-          COUNT=$(/usr/libexec/PlistBuddy -c "Print :DeveloperCertificates" /tmp/profile.plist | grep -c "Data" || echo 0)
-          echo "Profile references $COUNT certificate(s)."
-          python3 - <<'PY'
-          import plistlib, hashlib
-          with open('/tmp/profile.plist','rb') as f:
-              p = plistlib.load(f)
-          for i, cert in enumerate(p.get('DeveloperCertificates', [])):
-              print(f"  cert[{i}] SHA-1: {hashlib.sha1(cert).hexdigest().upper()}")
-          PY
-
       - name: Publish (build + sign + create .ipa)
         run: |
           dotnet publish "$PROJECT" -f "$FRAMEWORK" -c "$CONFIGURATION" \
