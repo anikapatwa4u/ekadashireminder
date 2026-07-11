@@ -4,6 +4,17 @@ name: Android Release
 # Trigger manually from the Actions tab, or on pushing a version tag like "v1.1.0".
 on:
   workflow_dispatch:
+    inputs:
+      track:
+        description: 'Google Play track to publish to'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
   push:
     tags:
       - 'v*'
@@ -17,6 +28,7 @@ jobs:
       DOTNET_VERSION: '10.0.x'
       CONFIGURATION: Release
       FRAMEWORK: net10.0-android
+      PACKAGE_NAME: com.anikapatwa.ekadashireminder
 
     steps:
       - name: Checkout
@@ -81,3 +93,18 @@ jobs:
         with:
           name: EkadashiReminder-aab
           path: ${{ steps.findaab.outputs.aab_path }}
+
+      - name: Write Google Play service account key
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          echo "$PLAY_SERVICE_ACCOUNT_JSON" > $RUNNER_TEMP/play-service-account.json
+
+      - name: Upload to Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJson: ${{ runner.temp }}/play-service-account.json
+          packageName: ${{ env.PACKAGE_NAME }}
+          releaseFiles: ${{ steps.findaab.outputs.aab_path }}
+          track: ${{ github.event.inputs.track || 'internal' }}
+          status: completed
