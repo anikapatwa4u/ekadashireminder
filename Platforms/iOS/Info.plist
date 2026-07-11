@@ -7,7 +7,6 @@
 	<key>UIDeviceFamily</key>
 	<array>
 		<integer>1</integer>
-		<integer>2</integer>
 	</array>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
@@ -32,5 +31,11 @@
 	<string>EkadashiReminder adds Ekadashi fasting days to your calendar so you never miss one.</string>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
 	<string>EkadashiReminder adds Ekadashi fasting days to your calendar so you never miss one.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>EkadashiReminder uses your location only to determine accurate local Ekadashi fasting and break-fast (Paaran) times for your city.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>EkadashiReminder uses your location only to determine accurate local Ekadashi fasting and break-fast (Paaran) times for your city.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
