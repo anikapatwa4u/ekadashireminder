@@ -10,7 +10,8 @@ on:
 
 jobs:
   build-ios:
-    runs-on: macos-15
+    # .NET 10 for iOS requires Xcode 26. Use the macOS 26 runner image which ships it.
+    runs-on: macos-26
 
     env:
       PROJECT: EkadashiReminder.csproj
@@ -28,20 +29,18 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Select Xcode 16.4
+      - name: Show available Xcode versions and select the latest
         run: |
-          # Hosted runners don't have the newest Xcode. Select the highest
-          # available so the .NET iOS workload matches it.
+          # .NET 10 for iOS needs Xcode 26.x. Pick the newest Xcode on the runner.
           ls /Applications | grep -i "Xcode"
-          sudo xcode-select -s /Applications/Xcode_16.4.app
+          LATEST_XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)
+          echo "Selecting: $LATEST_XCODE"
+          sudo xcode-select -s "$LATEST_XCODE"
           xcodebuild -version
 
-      - name: Pin and install MAUI workload compatible with the runner's Xcode
+      - name: Install MAUI workload
         run: |
-          # The latest iOS workload (26.5) requires Xcode 26.5, which hosted
-          # runners don't have. Pin the workload set to the .NET 10 GA release
-          # that supports Xcode 16.x.
-          dotnet workload install maui --version 10.0.100
+          dotnet workload install maui
           dotnet workload list
 
       - name: Import signing certificate
