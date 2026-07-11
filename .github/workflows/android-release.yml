@@ -57,6 +57,7 @@ jobs:
       - name: Publish signed .aab (Android App Bundle)
         run: |
           dotnet publish "$PROJECT" -f "$FRAMEWORK" -c "$CONFIGURATION" \
+            /p:TargetFrameworks="$FRAMEWORK" \
             /p:ApplicationVersion=${{ steps.versioncode.outputs.version_code }} \
             /p:AndroidPackageFormats=aab \
             /p:AndroidKeyStore=true \
