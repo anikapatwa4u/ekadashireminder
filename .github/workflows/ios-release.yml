@@ -1,0 +1,99 @@
+name: iOS Release
+
+# Build, sign, and upload the iOS app to App Store Connect (TestFlight).
+# Trigger manually from the Actions tab, or on pushing a version tag like "v1.1.0".
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+
+    env:
+      PROJECT: EkadashiReminder.csproj
+      DOTNET_VERSION: '10.0.x'
+      CONFIGURATION: Release
+      FRAMEWORK: net10.0-ios
+      RUNTIME_ID: ios-arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install MAUI workload
+        run: dotnet workload install maui
+
+      - name: Select latest stable Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Import signing certificate
+        env:
+          CERT_BASE64: ${{ secrets.IOS_DIST_CERT_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Create a temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import the distribution certificate (.p12)
+          echo "$CERT_BASE64" | base64 --decode > $RUNNER_TEMP/cert.p12
+          security import $RUNNER_TEMP/cert.p12 -P "$CERT_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Make the keychain the default so codesign can find the identity
+          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+      - name: Install provisioning profile
+        env:
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+        run: |
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILE_DIR"
+          echo "$PROFILE_BASE64" | base64 --decode > "$PROFILE_DIR/profile.mobileprovision"
+
+      - name: Publish (build + sign + create .ipa)
+        run: |
+          dotnet publish "$PROJECT" -f "$FRAMEWORK" -c "$CONFIGURATION" \
+            /p:ArchiveOnBuild=true \
+            /p:RuntimeIdentifier=$RUNTIME_ID \
+            /p:CodesignKey="${{ secrets.IOS_SIGNING_IDENTITY }}" \
+            /p:CodesignProvision="${{ secrets.IOS_PROVISION_NAME }}"
+
+      - name: Locate .ipa
+        id: findipa
+        run: |
+          IPA_PATH=$(find bin -name "*.ipa" | head -n 1)
+          echo "Found IPA at: $IPA_PATH"
+          echo "ipa_path=$IPA_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact (for download / debugging)
+        uses: actions/upload-artifact@v4
+        with:
+          name: EkadashiReminder-ipa
+          path: ${{ steps.findipa.outputs.ipa_path }}
+
+      - name: Upload to App Store Connect (TestFlight)
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APP_SPECIFIC_PASSWORD: ${{ secrets.APP_SPECIFIC_PASSWORD }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcrun altool --upload-app \
+            -f "${{ steps.findipa.outputs.ipa_path }}" \
+            -t ios \
+            -u "$APPLE_ID" \
+            -p "$APP_SPECIFIC_PASSWORD" \
+            --asc-provider "$TEAM_ID"
