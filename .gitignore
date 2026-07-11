@@ -54,6 +54,10 @@ artifacts/
 *.mobileprovision
 *.p12
 *.cer
+*.key
+*.csr
+*.pem
+*.pfx
 *.certSigningRequest
 
 # Android build outputs
