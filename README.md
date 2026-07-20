@@ -5,6 +5,17 @@
 [![iOS Release](https://github.com/anikapatwa4u/ekadashireminder/actions/workflows/ios-release.yml/badge.svg)](https://github.com/anikapatwa4u/ekadashireminder/actions/workflows/ios-release.yml)
 [![Android Release](https://github.com/anikapatwa4u/ekadashireminder/actions/workflows/android-release.yml/badge.svg)](https://github.com/anikapatwa4u/ekadashireminder/actions/workflows/android-release.yml)
 
+## ?? Download
+
+Ekadashi Reminder is live on both app stores:
+
+<a href="https://apps.apple.com/us/app/ekadashi-reminder/id6789737835"><img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store" height="48"></a>
+&nbsp;
+<a href="https://play.google.com/store/apps/details?id=com.anikapatwa.ekadashireminder"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" height="48"></a>
+
+- **iOS (App Store):** https://apps.apple.com/us/app/ekadashi-reminder/id6789737835
+- **Android (Google Play):** https://play.google.com/store/apps/details?id=com.anikapatwa.ekadashireminder
+
 ---
 
 ## ? Features
