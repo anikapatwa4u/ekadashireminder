@@ -120,10 +120,12 @@ EkadashiReminder/
 
 ## ?? License
 
-This project is for personal and educational use. Calendar data is derived from
-publicly available Vaishnava calendar sources.
+This project is licensed under the **MIT License** — see the [`LICENSE`](LICENSE) file for
+details. Calendar data is derived from publicly available Vaishnava calendar sources.
 
 ## ?? Acknowledgements
 
 - Vaishnava calendar data providers for the source iCal files.
 - The .NET MAUI community.
+- Thanks to family and friends who tested the app, gave feedback, and helped review the
+  project along the way.
