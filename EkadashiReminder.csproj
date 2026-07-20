@@ -48,6 +48,7 @@
   <ItemGroup>
     <None Include=".github\workflows\android-release.yml" />
     <None Include=".github\workflows\ios-release.yml" />
+    <None Include="EkadashiReminder.Tests\EkadashiReminder.Tests.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
