@@ -46,6 +46,7 @@
     <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
+    <None Include=".github\workflows\android-release.yml" />
     <None Include=".github\workflows\ios-release.yml" />
   </ItemGroup>
   <ItemGroup>
