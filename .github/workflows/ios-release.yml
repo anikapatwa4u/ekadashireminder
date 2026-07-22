@@ -59,7 +59,10 @@ jobs:
 
       - name: Install MAUI workload
         run: |
-          dotnet workload install maui
+          # Pin the workload set as well as the SDK. Without --version, the command
+          # downloads the newest iOS workload (currently 26.5.10301), which requires
+          # Xcode 26.6. The 10.0.202 workload set is compatible with Xcode 26.5.
+          dotnet workload install maui --version 10.0.202
           dotnet workload list
 
       - name: Import signing certificate
