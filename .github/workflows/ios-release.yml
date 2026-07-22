@@ -83,8 +83,11 @@ jobs:
             dotnet workload install maui
           else
             echo "Pinning iOS workload to 26.5.10284 to match Xcode $XVER."
-            # Roll the whole workload SET back first (this is what actually changes the
-            # installed version), then ensure maui is present at those pinned versions.
+            # The runner is configured to use "workload sets", in which mode a
+            # per-manifest --from-rollback-file is IGNORED (so the 26.5.10301 pack stays).
+            # Switch to loose-manifest mode first, then the rollback can downgrade the
+            # individual iOS/MacCatalyst manifests to 26.5.10284.
+            dotnet workload config --update-mode manifests
             dotnet workload update --from-rollback-file .github/workflows/ios-workload-rollback.json
             dotnet workload install maui --from-rollback-file .github/workflows/ios-workload-rollback.json
           fi
