@@ -44,15 +44,16 @@ jobs:
           for XC in $(ls -d /Applications/Xcode*.app 2>/dev/null | sort -Vr); do
             DEV="$XC/Contents/Developer"
             echo "Checking $XC ..."
-            SDK_OK=$(ls -d "$DEV/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" 2>/dev/null)
-            if [ -n "$SDK_OK" ] \
-               && DEVELOPER_DIR="$DEV" xcrun --find actool >/dev/null 2>&1 \
-               && DEVELOPER_DIR="$DEV" xcrun --find ibtool >/dev/null 2>&1; then
+            # Actually EXECUTE the toolchain utilities (not just --find, which falls back
+            # to the command-line tools and gives false positives on broken Xcodes).
+            if DEVELOPER_DIR="$DEV" xcrun clang --version   >/dev/null 2>&1 \
+               && DEVELOPER_DIR="$DEV" xcrun actool --version >/dev/null 2>&1 \
+               && DEVELOPER_DIR="$DEV" xcrun ibtool --version >/dev/null 2>&1; then
               SELECTED="$XC"
-              echo "  -> usable (SDK + actool + ibtool present)"
+              echo "  -> usable (clang + actool + ibtool actually run)"
               break
             else
-              echo "  -> skipped (missing SDK/actool/ibtool)"
+              echo "  -> skipped (a required tool failed to run)"
             fi
           done
 
@@ -73,11 +74,7 @@ jobs:
         run: |
           # The auto-updated iOS workload (26.5.10301) requires Xcode 26.6. On this runner
           # the only Xcode 26.6 (Xcode_26.6.0) is a broken/partial install, so we must
-          # build with the healthy Xcode 26.5 instead. That means the workload MUST be
-          # pinned to 26.5.10284 (which targets Xcode 26.5).
-          #
-          # NOTE: `dotnet workload install --from-rollback-file` will NOT downgrade an
-          # already-installed newer workload. We must use `workload update` for that.
+          # build with the healthy Xcode 26.5 and pin the workload to 26.5.10284.
           XVER="${{ steps.xcode.outputs.xcode_version }}"
           echo "Selected Xcode version: $XVER"
 
@@ -86,9 +83,26 @@ jobs:
             dotnet workload install maui
           else
             echo "Pinning iOS workload to 26.5.10284 to match Xcode $XVER."
-            # Ensure the maui workload is present, then force it to the pinned versions.
-            dotnet workload install maui
+            # Roll the whole workload SET back first (this is what actually changes the
+            # installed version), then ensure maui is present at those pinned versions.
             dotnet workload update --from-rollback-file .github/workflows/ios-workload-rollback.json
+            dotnet workload install maui --from-rollback-file .github/workflows/ios-workload-rollback.json
+          fi
+
+          echo "===== Installed workloads ====="
+          dotnet workload list
+          echo "===== Installed Microsoft.iOS.Sdk packs ====="
+          ls "$HOME/.dotnet/packs" | grep -i "Microsoft.iOS.Sdk" || true
+
+          # Hard guard: fail early (with a clear message) if the pinned downgrade did not
+          # take effect, rather than failing deep inside the build with cryptic clang errors.
+          if [ "$XVER" != "26.6" ]; then
+            if ls "$HOME/.dotnet/packs" | grep -q "Microsoft.iOS.Sdk.net10.0_26.5/26.5.10301" 2>/dev/null \
+               || ls -d "$HOME/.dotnet/packs/Microsoft.iOS.Sdk.net10.0_26.5/26.5.10301" >/dev/null 2>&1; then
+              echo "ERROR: iOS workload is still 26.5.10301 (requires Xcode 26.6) but only Xcode $XVER is usable." >&2
+              echo "The rollback did not downgrade the workload." >&2
+              exit 1
+            fi
           fi
 
           echo "===== Installed workloads ====="
