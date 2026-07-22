@@ -29,17 +29,16 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Show available Xcode versions and select a compatible one
+      - name: Show available Xcode versions and select the newest
         run: |
-          # .NET 10 for iOS pins to an EXACT Xcode version (currently 26.5).
-          # Selecting a newer Xcode (e.g. 26.6) also fails, so pick 26.5 if present,
-          # otherwise fall back to the newest 26.x available.
+          # The .NET 10 iOS workload pins to an EXACT Xcode version and auto-updates
+          # (e.g. workload 26.5.10301 requires Xcode 26.6). To stay in sync we always
+          # select the NEWEST Xcode 26.x present on the runner, which tracks the workload.
           echo "Installed Xcodes:"
-          ls /Applications | grep -i "Xcode"
-          if [ -d "/Applications/Xcode_26.5.app" ]; then
-            SELECTED="/Applications/Xcode_26.5.app"
-          else
-            SELECTED=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)
+          ls /Applications | grep -i "Xcode" || true
+          SELECTED=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$SELECTED" ]; then
+            SELECTED=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -n 1)
           fi
           echo "Selecting: $SELECTED"
           sudo xcode-select -s "$SELECTED"
