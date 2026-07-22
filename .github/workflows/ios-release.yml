@@ -83,13 +83,25 @@ jobs:
             dotnet workload install maui
           else
             echo "Pinning iOS workload to 26.5.10284 to match Xcode $XVER."
-            # The runner is configured to use "workload sets", in which mode a
-            # per-manifest --from-rollback-file is IGNORED (so the 26.5.10301 pack stays).
-            # Switch to loose-manifest mode first, then the rollback can downgrade the
-            # individual iOS/MacCatalyst manifests to 26.5.10284.
+
+            # Determine the SDK's actual feature band (e.g. 10.0.300). A rollback file
+            # whose band does not match the running SDK's band is SILENTLY IGNORED, which
+            # is why previous downgrade attempts had no effect. So we generate the rollback
+            # file dynamically using the real band.
+            SDK_VER=$(dotnet --version)
+            echo "SDK version: $SDK_VER"
+            # Feature band = major.minor.(patch hundreds), e.g. 10.0.301 -> 10.0.300
+            BAND=$(echo "$SDK_VER" | awk -F. '{printf "%d.%d.%d", $1, $2, (int($3/100)*100)}')
+            echo "Feature band: $BAND"
+
+            printf '{\n  "microsoft.net.sdk.ios": "26.5.10284/%s",\n  "microsoft.net.sdk.maccatalyst": "26.5.10284/%s"\n}\n' "$BAND" "$BAND" > /tmp/ios-rollback.json
+            echo "Generated rollback file:"
+            cat /tmp/ios-rollback.json
+
+            # Switch out of "workload set" mode so per-manifest rollbacks apply, then pin.
             dotnet workload config --update-mode manifests
-            dotnet workload update --from-rollback-file .github/workflows/ios-workload-rollback.json
-            dotnet workload install maui --from-rollback-file .github/workflows/ios-workload-rollback.json
+            dotnet workload update --from-rollback-file /tmp/ios-rollback.json
+            dotnet workload install maui --from-rollback-file /tmp/ios-rollback.json
           fi
 
           echo "===== Installed workloads ====="
