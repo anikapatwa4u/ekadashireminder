@@ -59,20 +59,27 @@ jobs:
             if [ ! -d "$SDK" ]; then
               echo "  skip: macOS SDK missing"; continue
             fi
-            # Use the exact resolution mechanism the .NET iOS SDK relies on.
-            if DEVELOPER_DIR="$DEV" xcodebuild -sdk "$SDK" -find clang >/dev/null 2>&1 \
-               && DEVELOPER_DIR="$DEV" xcodebuild -sdk "$SDK" -find actool >/dev/null 2>&1; then
+            # The build resolves tools through BOTH mechanisms depending on stage:
+            #   * clang  -> xcodebuild -sdk <macOS SDK> -find clang
+            #   * actool -> xcrun --find actool
+            # On this runner these two can DISAGREE for the same Xcode (e.g. 26.6
+            # passes xcodebuild -find actool but fails xcrun --find actool), so an
+            # Xcode must satisfy ALL FOUR checks to be considered usable.
+            if DEVELOPER_DIR="$DEV" xcodebuild -sdk "$SDK" -find clang  >/dev/null 2>&1 \
+               && DEVELOPER_DIR="$DEV" xcodebuild -sdk "$SDK" -find actool >/dev/null 2>&1 \
+               && DEVELOPER_DIR="$DEV" xcrun --find clang  >/dev/null 2>&1 \
+               && DEVELOPER_DIR="$DEV" xcrun --find actool >/dev/null 2>&1; then
               SELECTED="$DEV"
               SELECTED_VER=$(DEVELOPER_DIR="$DEV" xcodebuild -version | head -n 1 | awk '{print $2}')
-              echo "  -> USABLE (clang + actool resolved). Version $SELECTED_VER"
+              echo "  -> USABLE (clang + actool resolve via BOTH xcodebuild and xcrun). Version $SELECTED_VER"
               break
             else
-              echo "  skip: xcodebuild -find clang/actool failed"
+              echo "  skip: clang/actool not resolvable via both xcodebuild -find and xcrun --find"
             fi
           done
 
           if [ -z "$SELECTED" ]; then
-            echo "No Xcode on this runner can resolve clang/actool via xcodebuild -find." >&2
+            echo "No Xcode on this runner can resolve clang/actool via both xcodebuild -find and xcrun --find." >&2
             exit 1
           fi
 
@@ -84,6 +91,8 @@ jobs:
           MACOS_SDK="$SELECTED/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
           xcodebuild -sdk "$MACOS_SDK" -find clang
           xcodebuild -sdk "$MACOS_SDK" -find actool
+          xcrun --find clang
+          xcrun --find actool
 
       - name: Install MAUI workload
         run: |
