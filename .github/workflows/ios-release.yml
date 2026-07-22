@@ -29,101 +29,33 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Select a fully-working Xcode
-        id: xcode
+      - name: Select Xcode 26.6 toolchain
         run: |
-          # The .NET 10 iOS workload pins to an EXACT Xcode version. Runners sometimes
-          # carry a partially-installed newer Xcode (e.g. Xcode_26.6.0) whose macOS SDK,
-          # actool and ibtool are missing, which breaks asset/storyboard compilation.
-          # We therefore select the NEWEST Xcode that is FULLY usable: its macOS SDK must
-          # exist AND both actool and ibtool must resolve.
-          echo "Installed Xcodes:"
-          ls /Applications | grep -i "Xcode" || true
-
-          SELECTED=""
-          for XC in $(ls -d /Applications/Xcode*.app 2>/dev/null | sort -Vr); do
-            DEV="$XC/Contents/Developer"
-            echo "Checking $XC ..."
-            # Actually EXECUTE the toolchain utilities (not just --find, which falls back
-            # to the command-line tools and gives false positives on broken Xcodes).
-            if DEVELOPER_DIR="$DEV" xcrun clang --version   >/dev/null 2>&1 \
-               && DEVELOPER_DIR="$DEV" xcrun actool --version >/dev/null 2>&1 \
-               && DEVELOPER_DIR="$DEV" xcrun ibtool --version >/dev/null 2>&1; then
-              SELECTED="$XC"
-              echo "  -> usable (clang + actool + ibtool actually run)"
-              break
-            else
-              echo "  -> skipped (a required tool failed to run)"
-            fi
-          done
-
-          if [ -z "$SELECTED" ]; then
-            echo "No fully-usable Xcode found!" >&2
+          # The installed .NET iOS workload requires Xcode 26.6. xcode-select must
+          # receive Contents/Developer, not the Xcode .app bundle itself. Exporting
+          # DEVELOPER_DIR ensures all later MSBuild/xcrun calls use this exact toolchain.
+          XCODE_APP=$(ls -d /Applications/Xcode_26.6*.app 2>/dev/null | head -n 1)
+          if [ -z "$XCODE_APP" ]; then
+            echo "Xcode 26.6 is required by the installed .NET iOS workload." >&2
+            echo "Installed Xcodes:" >&2
+            ls /Applications | grep -i "Xcode" >&2 || true
             exit 1
           fi
 
-          echo "Selecting: $SELECTED"
-          sudo xcode-select -s "$SELECTED"
+          DEVELOPER_PATH="$XCODE_APP/Contents/Developer"
+          test -x "$DEVELOPER_PATH/usr/bin/xcodebuild"
+          sudo xcode-select -s "$DEVELOPER_PATH"
+          echo "DEVELOPER_DIR=$DEVELOPER_PATH" >> "$GITHUB_ENV"
+          echo "Selected developer directory: $DEVELOPER_PATH"
           xcodebuild -version
-          # Expose the selected Xcode's marketing version (e.g. 26.5) for the workload step.
-          XVER=$(xcodebuild -version | head -n1 | awk '{print $2}')
-          echo "xcode_version=$XVER" >> "$GITHUB_OUTPUT"
-          echo "Selected Xcode version: $XVER"
+          xcrun --sdk macosx --find clang++
+          xcrun --find actool
+          xcrun --find ibtool
 
-      - name: Install MAUI workload (matched to the selected Xcode)
+      - name: Install MAUI workload
         run: |
-          # The auto-updated iOS workload (26.5.10301) requires Xcode 26.6. On this runner
-          # the only Xcode 26.6 (Xcode_26.6.0) is a broken/partial install, so we must
-          # build with the healthy Xcode 26.5 and pin the workload to 26.5.10284.
-          XVER="${{ steps.xcode.outputs.xcode_version }}"
-          echo "Selected Xcode version: $XVER"
-
-          if [ "$XVER" = "26.6" ]; then
-            echo "Xcode 26.6 available - installing latest maui workload."
-            dotnet workload install maui
-          else
-            echo "Pinning iOS workload to 26.5.10284 to match Xcode $XVER."
-
-            # Determine the SDK's actual feature band (e.g. 10.0.300). A rollback file
-            # whose band does not match the running SDK's band is SILENTLY IGNORED, which
-            # is why previous downgrade attempts had no effect. So we generate the rollback
-            # file dynamically using the real band.
-            SDK_VER=$(dotnet --version)
-            echo "SDK version: $SDK_VER"
-            # Feature band = major.minor.(patch hundreds), e.g. 10.0.301 -> 10.0.300
-            BAND=$(echo "$SDK_VER" | awk -F. '{printf "%d.%d.%d", $1, $2, (int($3/100)*100)}')
-            echo "Feature band: $BAND"
-
-            printf '{\n  "microsoft.net.sdk.ios": "26.5.10284/%s",\n  "microsoft.net.sdk.maccatalyst": "26.5.10284/%s"\n}\n' "$BAND" "$BAND" > /tmp/ios-rollback.json
-            echo "Generated rollback file:"
-            cat /tmp/ios-rollback.json
-
-            # Switch out of "workload set" mode so per-manifest rollbacks apply, then pin.
-            dotnet workload config --update-mode manifests
-            dotnet workload update --from-rollback-file /tmp/ios-rollback.json
-            dotnet workload install maui --from-rollback-file /tmp/ios-rollback.json
-          fi
-
-          echo "===== Installed workloads ====="
+          dotnet workload install maui
           dotnet workload list
-          echo "===== Installed Microsoft.iOS.Sdk packs ====="
-          ls "$HOME/.dotnet/packs" | grep -i "Microsoft.iOS.Sdk" || true
-
-          # Hard guard: fail early (with a clear message) if the pinned downgrade did not
-          # take effect, rather than failing deep inside the build with cryptic clang errors.
-          if [ "$XVER" != "26.6" ]; then
-            if ls "$HOME/.dotnet/packs" | grep -q "Microsoft.iOS.Sdk.net10.0_26.5/26.5.10301" 2>/dev/null \
-               || ls -d "$HOME/.dotnet/packs/Microsoft.iOS.Sdk.net10.0_26.5/26.5.10301" >/dev/null 2>&1; then
-              echo "ERROR: iOS workload is still 26.5.10301 (requires Xcode 26.6) but only Xcode $XVER is usable." >&2
-              echo "The rollback did not downgrade the workload." >&2
-              exit 1
-            fi
-          fi
-
-          echo "===== Installed workloads ====="
-          dotnet workload list
-          echo "===== Installed Microsoft.iOS.Sdk packs ====="
-          ls "$HOME/.dotnet/packs" | grep -i "Microsoft.iOS.Sdk" || true
 
       - name: Import signing certificate
         env:
