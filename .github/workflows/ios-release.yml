@@ -31,16 +31,17 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Select Xcode 26.5 toolchain
+      - name: Select Xcode 26.3 toolchain
         run: |
-          # Xcode 26.6 on the hosted macos-26 image is incomplete: its macOS SDK and
-          # clang are missing. Use the complete Xcode 26.5 installation together with
-          # the pinned .NET 10.0.202 workload set.
+          # The pinned .NET 10.0.202 workload set ships the iOS pack 26.2.10233,
+          # which requires Xcode 26.3. The Xcode version selected here MUST match
+          # what the installed iOS workload expects, otherwise the build fails with
+          # "This version of .NET for iOS requires Xcode 26.3".
           #
           # xcode-select must receive Contents/Developer, not the .app bundle itself.
-          XCODE_APP=$(ls -d /Applications/Xcode_26.5*.app 2>/dev/null | head -n 1)
+          XCODE_APP=$(ls -d /Applications/Xcode_26.3*.app 2>/dev/null | head -n 1)
           if [ -z "$XCODE_APP" ]; then
-            echo "Xcode 26.5 is required by this pinned release workflow." >&2
+            echo "Xcode 26.3 is required by this pinned release workflow." >&2
             echo "Installed Xcodes:" >&2
             ls /Applications | grep -i "Xcode" >&2 || true
             exit 1
