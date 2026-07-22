@@ -56,6 +56,9 @@
     <Compile Remove="EkadashiReminder.Tests\**\*.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include=".github\workflows\ios-workload-rollback.json" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.9" />
     <PackageReference Include="Plugin.LocalNotification" Version="11.1.3" />
