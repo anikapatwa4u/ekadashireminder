@@ -31,17 +31,22 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Select Xcode 26.3 toolchain
+      - name: Select Xcode 26.5 toolchain
         run: |
-          # The pinned .NET 10.0.202 workload set ships the iOS pack 26.2.10233,
-          # which requires Xcode 26.3. The Xcode version selected here MUST match
-          # what the installed iOS workload expects, otherwise the build fails with
-          # "This version of .NET for iOS requires Xcode 26.3".
+          # Constraint on the macos-26 runner:
+          #   * The pinned iOS workload (26.2.10233) *requires* Xcode 26.3.
+          #   * But the Xcode 26.3 install on the image is INCOMPLETE - its macOS SDK
+          #     and command-line tools (actool/ibtool) are missing, which fails the
+          #     asset-catalog build with: unable to find utility "actool".
+          #   * The only COMPLETE Xcode on the image is 26.5.
+          # So we select the complete Xcode 26.5 here and disable the .NET for iOS
+          # Xcode version check at publish time (see the Publish step) so the pinned
+          # workload accepts it.
           #
           # xcode-select must receive Contents/Developer, not the .app bundle itself.
-          XCODE_APP=$(ls -d /Applications/Xcode_26.3*.app 2>/dev/null | head -n 1)
+          XCODE_APP=$(ls -d /Applications/Xcode_26.5*.app 2>/dev/null | head -n 1)
           if [ -z "$XCODE_APP" ]; then
-            echo "Xcode 26.3 is required by this pinned release workflow." >&2
+            echo "Xcode 26.5 is required by this release workflow." >&2
             echo "Installed Xcodes:" >&2
             ls /Applications | grep -i "Xcode" >&2 || true
             exit 1
@@ -55,6 +60,7 @@ jobs:
           xcodebuild -version
           xcrun --sdk macosx --show-sdk-path
           xcrun --sdk macosx clang++ --version
+          # Fail fast if the selected Xcode is missing the asset-catalog tools.
           xcrun --find actool
           xcrun --find ibtool
 
@@ -108,9 +114,14 @@ jobs:
 
       - name: Publish (build + sign + create .ipa)
         run: |
+          # _XcodeVersionCheckExitCode=0 disables the strict Xcode-version check in
+          # the .NET for iOS SDK. The pinned workload (26.2.10233) nominally requires
+          # Xcode 26.3, but only Xcode 26.5 is complete on the runner; 26.5 is
+          # backward-compatible for building this app.
           dotnet publish "$PROJECT" -f "$FRAMEWORK" -c "$CONFIGURATION" \
             /p:ArchiveOnBuild=true \
             /p:RuntimeIdentifier=$RUNTIME_ID \
+            /p:_XcodeVersionCheckExitCode=0 \
             /p:ApplicationVersion=${{ steps.buildnum.outputs.build_number }} \
             /p:CodesignKey="${{ secrets.IOS_SIGNING_IDENTITY }}" \
             /p:CodesignProvision="${{ secrets.IOS_PROVISION_NAME }}"
