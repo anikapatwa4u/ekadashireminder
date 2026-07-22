@@ -29,41 +29,60 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Show available Xcode versions and select the newest
+      - name: Select a fully-working Xcode
+        id: xcode
         run: |
-          # The .NET 10 iOS workload pins to an EXACT Xcode version and auto-updates.
-          # Some runners also carry a partially-installed newer Xcode whose macOS SDK /
-          # actool are missing (which breaks the asset-catalog compile). So we pick the
-          # NEWEST Xcode that is actually usable: it must resolve `actool` via xcrun.
+          # The .NET 10 iOS workload pins to an EXACT Xcode version. Runners sometimes
+          # carry a partially-installed newer Xcode (e.g. Xcode_26.6.0) whose macOS SDK,
+          # actool and ibtool are missing, which breaks asset/storyboard compilation.
+          # We therefore select the NEWEST Xcode that is FULLY usable: its macOS SDK must
+          # exist AND both actool and ibtool must resolve.
           echo "Installed Xcodes:"
           ls /Applications | grep -i "Xcode" || true
 
           SELECTED=""
-          for XC in $(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -Vr) \
-                    $(ls -d /Applications/Xcode*.app 2>/dev/null | sort -Vr); do
+          for XC in $(ls -d /Applications/Xcode*.app 2>/dev/null | sort -Vr); do
+            DEV="$XC/Contents/Developer"
             echo "Checking $XC ..."
-            if DEVELOPER_DIR="$XC/Contents/Developer" xcrun --find actool >/dev/null 2>&1; then
+            SDK_OK=$(ls -d "$DEV/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" 2>/dev/null)
+            if [ -n "$SDK_OK" ] \
+               && DEVELOPER_DIR="$DEV" xcrun --find actool >/dev/null 2>&1 \
+               && DEVELOPER_DIR="$DEV" xcrun --find ibtool >/dev/null 2>&1; then
               SELECTED="$XC"
-              echo "  -> usable (actool found)"
+              echo "  -> usable (SDK + actool + ibtool present)"
               break
             else
-              echo "  -> skipped (actool/SDK missing)"
+              echo "  -> skipped (missing SDK/actool/ibtool)"
             fi
           done
 
           if [ -z "$SELECTED" ]; then
-            echo "No usable Xcode with actool found!" >&2
+            echo "No fully-usable Xcode found!" >&2
             exit 1
           fi
 
           echo "Selecting: $SELECTED"
           sudo xcode-select -s "$SELECTED"
           xcodebuild -version
-          xcrun --find actool
+          # Expose the selected Xcode's marketing version (e.g. 26.5) for the workload step.
+          XVER=$(xcodebuild -version | head -n1 | awk '{print $2}')
+          echo "xcode_version=$XVER" >> "$GITHUB_OUTPUT"
+          echo "Selected Xcode version: $XVER"
 
-      - name: Install MAUI workload
+      - name: Install MAUI workload (matched to the selected Xcode)
         run: |
-          dotnet workload install maui
+          # If we could not select Xcode 26.6, the auto-updated iOS workload (which
+          # requires 26.6) will not build. In that case roll the iOS workload back to
+          # 26.5.10284, which requires Xcode 26.5 - the known-good combination.
+          XVER="${{ steps.xcode.outputs.xcode_version }}"
+          if [ "$XVER" != "26.6" ]; then
+            echo "Selected Xcode $XVER (not 26.6) - pinning iOS workload to 26.5.10284."
+            dotnet workload install maui \
+              --from-rollback-file .github/workflows/ios-workload-rollback.json
+          else
+            echo "Selected Xcode 26.6 - installing latest maui workload."
+            dotnet workload install maui
+          fi
           dotnet workload list
 
       - name: Import signing certificate
