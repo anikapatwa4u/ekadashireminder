@@ -54,12 +54,26 @@ jobs:
           sudo xcode-select -s "$DEVELOPER_PATH"
           echo "DEVELOPER_DIR=$DEVELOPER_PATH" >> "$GITHUB_ENV"
           echo "Selected developer directory: $DEVELOPER_PATH"
+
+          # Accept the license and run first-launch component installation. Without
+          # this, `xcodebuild -find <tool>` (which is exactly how the .NET iOS SDK
+          # resolves clang/actool) fails with "unable to find utility clang" even
+          # though plain `xcrun` can locate the tools. This is the root cause of the
+          # "clang exited with code 72 / unable to find utility clang" build error.
+          sudo xcodebuild -license accept || true
+          sudo xcodebuild -runFirstLaunch || true
+
           xcodebuild -version
           xcrun --sdk macosx --show-sdk-path
           xcrun --sdk macosx clang++ --version
           # Fail fast if the selected Xcode is missing the asset-catalog tools.
           xcrun --find actool
           xcrun --find ibtool
+          # Probe the EXACT resolution mechanism the .NET iOS SDK uses so we fail
+          # here (with a clear message) rather than deep inside the build.
+          MACOS_SDK="$DEVELOPER_PATH/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+          xcodebuild -sdk "$MACOS_SDK" -find clang
+          xcodebuild -sdk "$MACOS_SDK" -find actool
 
       - name: Install MAUI workload
         run: |
