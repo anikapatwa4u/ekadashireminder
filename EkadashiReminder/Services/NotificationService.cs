@@ -131,6 +131,36 @@ public class NotificationService
         return pending.Select(n => n.NotificationId).ToHashSet();
     }
 
+    /// <summary>
+    /// Cancels every pending Ekadashi/reminder notification and reschedules from the
+    /// supplied, correct event data.
+    ///
+    /// Why this exists: an earlier version could schedule reminders for the wrong
+    /// location's Ekadashi date (a load race). Because each notification id is derived
+    /// from its date, those stale "wrong date" notifications would otherwise linger for
+    /// existing users even after the code fix. This method reconciles them: it clears
+    /// all previously scheduled notifications, then reschedules the correct ones.
+    /// </summary>
+    public async Task ResyncAsync(
+        IEnumerable<EkadashiEvent> correctUpcomingEvents,
+        IEnumerable<CustomReminder> customReminders)
+    {
+        // 1. Cancel everything we may have previously scheduled.
+        var pending = await GetScheduledIdsAsync();
+        if (pending.Count > 0)
+            LocalNotificationCenter.Current.Cancel([.. pending]);
+
+        // 2. Reschedule Ekadashi reminders from the correct, current data.
+        foreach (var ev in correctUpcomingEvents)
+        {
+            await ScheduleForEventAsync(ev);
+            ev.ReminderEnabled = true;
+        }
+
+        // 3. Reschedule custom reminders.
+        await ScheduleAllNotificationsAsync([], customReminders);
+    }
+
     public static async Task<bool> RequestPermissionAsync()
     {
         return await LocalNotificationCenter.Current.RequestNotificationPermission();

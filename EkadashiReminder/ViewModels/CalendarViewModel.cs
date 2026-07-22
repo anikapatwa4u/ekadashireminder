@@ -226,10 +226,27 @@ public class CalendarViewModel : INotifyPropertyChanged
             // Capture the lists needed before leaving the UI-thread context.
             if (scheduleReminders)
             {
-                var eventsToSchedule = NextFourEvents.Where(e => !e.ReminderEnabled).ToList();
+                var upcomingSnapshot  = NextFourEvents.ToList();
+                var eventsToSchedule  = NextFourEvents.Where(e => !e.ReminderEnabled).ToList();
                 var remindersSnapshot = customReminders.ToList();
+
+                // One-time reconciliation for users upgrading from a version that could
+                // schedule reminders for the wrong location's Ekadashi date. Clears any
+                // stale notifications and reschedules from the correct data. Runs once.
+                const string ResyncKey = "reminders_resynced_v2";
+                var needsResync = !Preferences.Default.Get(ResyncKey, false);
+
                 _ = Task.Run(async () =>
                 {
+                    if (needsResync)
+                    {
+                        await _notificationService.ResyncAsync(upcomingSnapshot, remindersSnapshot);
+                        foreach (var ev in upcomingSnapshot)
+                            ev.ReminderEnabled = true;
+                        Preferences.Default.Set(ResyncKey, true);
+                        return;
+                    }
+
                     foreach (var ev in eventsToSchedule)
                     {
                         await _notificationService.ScheduleForEventAsync(ev);

@@ -21,8 +21,8 @@
     <!-- App Identifier -->
     <ApplicationId>com.anikapatwa.ekadashireminder</ApplicationId>
     <!-- Versions -->
-    <ApplicationDisplayVersion>1.1.2</ApplicationDisplayVersion>
-    <ApplicationVersion>6</ApplicationVersion>
+    <ApplicationDisplayVersion>1.1.3</ApplicationDisplayVersion>
+    <ApplicationVersion>7</ApplicationVersion>
     <!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
     <WindowsPackageType>None</WindowsPackageType>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
