@@ -31,18 +31,35 @@ jobs:
 
       - name: Show available Xcode versions and select the newest
         run: |
-          # The .NET 10 iOS workload pins to an EXACT Xcode version and auto-updates
-          # (e.g. workload 26.5.10301 requires Xcode 26.6). To stay in sync we always
-          # select the NEWEST Xcode 26.x present on the runner, which tracks the workload.
+          # The .NET 10 iOS workload pins to an EXACT Xcode version and auto-updates.
+          # Some runners also carry a partially-installed newer Xcode whose macOS SDK /
+          # actool are missing (which breaks the asset-catalog compile). So we pick the
+          # NEWEST Xcode that is actually usable: it must resolve `actool` via xcrun.
           echo "Installed Xcodes:"
           ls /Applications | grep -i "Xcode" || true
-          SELECTED=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)
+
+          SELECTED=""
+          for XC in $(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -Vr) \
+                    $(ls -d /Applications/Xcode*.app 2>/dev/null | sort -Vr); do
+            echo "Checking $XC ..."
+            if DEVELOPER_DIR="$XC/Contents/Developer" xcrun --find actool >/dev/null 2>&1; then
+              SELECTED="$XC"
+              echo "  -> usable (actool found)"
+              break
+            else
+              echo "  -> skipped (actool/SDK missing)"
+            fi
+          done
+
           if [ -z "$SELECTED" ]; then
-            SELECTED=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -n 1)
+            echo "No usable Xcode with actool found!" >&2
+            exit 1
           fi
+
           echo "Selecting: $SELECTED"
           sudo xcode-select -s "$SELECTED"
           xcodebuild -version
+          xcrun --find actool
 
       - name: Install MAUI workload
         run: |
