@@ -15,7 +15,9 @@ jobs:
 
     env:
       PROJECT: EkadashiReminder.csproj
-      DOTNET_VERSION: '10.0.x'
+      # Pin the SDK so its iOS workload does not silently advance to a version
+      # requiring a newer Xcode than the hosted runner provides.
+      DOTNET_VERSION: '10.0.202'
       CONFIGURATION: Release
       FRAMEWORK: net10.0-ios
       RUNTIME_ID: ios-arm64
@@ -29,14 +31,16 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Select Xcode 26.6 toolchain
+      - name: Select Xcode 26.5 toolchain
         run: |
-          # The installed .NET iOS workload requires Xcode 26.6. xcode-select must
-          # receive Contents/Developer, not the Xcode .app bundle itself. Exporting
-          # DEVELOPER_DIR ensures all later MSBuild/xcrun calls use this exact toolchain.
-          XCODE_APP=$(ls -d /Applications/Xcode_26.6*.app 2>/dev/null | head -n 1)
+          # Xcode 26.6 on the hosted macos-26 image is incomplete: its macOS SDK and
+          # clang are missing. Use the complete Xcode 26.5 installation together with
+          # the pinned .NET 10.0.202 workload set.
+          #
+          # xcode-select must receive Contents/Developer, not the .app bundle itself.
+          XCODE_APP=$(ls -d /Applications/Xcode_26.5*.app 2>/dev/null | head -n 1)
           if [ -z "$XCODE_APP" ]; then
-            echo "Xcode 26.6 is required by the installed .NET iOS workload." >&2
+            echo "Xcode 26.5 is required by this pinned release workflow." >&2
             echo "Installed Xcodes:" >&2
             ls /Applications | grep -i "Xcode" >&2 || true
             exit 1
@@ -48,7 +52,8 @@ jobs:
           echo "DEVELOPER_DIR=$DEVELOPER_PATH" >> "$GITHUB_ENV"
           echo "Selected developer directory: $DEVELOPER_PATH"
           xcodebuild -version
-          xcrun --sdk macosx --find clang++
+          xcrun --sdk macosx --show-sdk-path
+          xcrun --sdk macosx clang++ --version
           xcrun --find actool
           xcrun --find ibtool
 
