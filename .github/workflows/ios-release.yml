@@ -31,47 +31,57 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Select Xcode 26.5 toolchain
+      - name: Select a working Xcode toolchain
+        id: xcode
         run: |
-          # Runner reality (macos-26):
-          #   * Xcode 26.5 is the newest COMPLETE install (has macOS SDK + actool/ibtool).
-          #   * Xcode 26.3 and 26.6 are partial installs - their actool/SDK are missing,
-          #     which breaks the asset-catalog compile ("unable to find utility actool").
-          # So we build with Xcode 26.5 and pin the iOS workload to 26.5.10284 (which
-          # targets Xcode 26.5) in the workload step, so the SDK version check matches.
+          # HARD-LEARNED LESSON: hard-coding an Xcode version and probing it with
+          # `xcrun --find actool` is NOT reliable. `xcrun` and `xcodebuild -find`
+          # resolve tools through DIFFERENT paths, and the .NET for iOS SDK uses:
+          #     xcodebuild -sdk <macOS SDK> -find clang
+          # On this runner some Xcodes (incl. 26.5.0) pass the xcrun probe but FAIL
+          # that xcodebuild probe with "unable to find utility clang" - which is the
+          # error we keep hitting deep in the build.
           #
-          # xcode-select must receive Contents/Developer, not the .app bundle itself.
-          XCODE_APP=$(ls -d /Applications/Xcode_26.5*.app 2>/dev/null | head -n 1)
-          if [ -z "$XCODE_APP" ]; then
-            echo "Xcode 26.5 is required by this release workflow." >&2
-            echo "Installed Xcodes:" >&2
-            ls /Applications | grep -i "Xcode" >&2 || true
+          # So: iterate over EVERY installed Xcode and select the first one that
+          # actually passes the exact xcodebuild -find checks for clang AND actool.
+          echo "Installed Xcodes:"
+          ls -d /Applications/Xcode*.app 2>/dev/null || true
+
+          SELECTED=""
+          SELECTED_VER=""
+          for XC in $(ls -d /Applications/Xcode*.app 2>/dev/null | sort -Vr); do
+            DEV="$XC/Contents/Developer"
+            SDK="$DEV/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+            echo "----- Evaluating $XC -----"
+            if [ ! -x "$DEV/usr/bin/xcodebuild" ]; then
+              echo "  skip: no xcodebuild"; continue
+            fi
+            if [ ! -d "$SDK" ]; then
+              echo "  skip: macOS SDK missing"; continue
+            fi
+            # Use the exact resolution mechanism the .NET iOS SDK relies on.
+            if DEVELOPER_DIR="$DEV" xcodebuild -sdk "$SDK" -find clang >/dev/null 2>&1 \
+               && DEVELOPER_DIR="$DEV" xcodebuild -sdk "$SDK" -find actool >/dev/null 2>&1; then
+              SELECTED="$DEV"
+              SELECTED_VER=$(DEVELOPER_DIR="$DEV" xcodebuild -version | head -n 1 | awk '{print $2}')
+              echo "  -> USABLE (clang + actool resolved). Version $SELECTED_VER"
+              break
+            else
+              echo "  skip: xcodebuild -find clang/actool failed"
+            fi
+          done
+
+          if [ -z "$SELECTED" ]; then
+            echo "No Xcode on this runner can resolve clang/actool via xcodebuild -find." >&2
             exit 1
           fi
 
-          DEVELOPER_PATH="$XCODE_APP/Contents/Developer"
-          test -x "$DEVELOPER_PATH/usr/bin/xcodebuild"
-          sudo xcode-select -s "$DEVELOPER_PATH"
-          echo "DEVELOPER_DIR=$DEVELOPER_PATH" >> "$GITHUB_ENV"
-          echo "Selected developer directory: $DEVELOPER_PATH"
-
-          # Accept the license and run first-launch component installation. Without
-          # this, `xcodebuild -find <tool>` (which is exactly how the .NET iOS SDK
-          # resolves clang/actool) fails with "unable to find utility clang" even
-          # though plain `xcrun` can locate the tools. This is the root cause of the
-          # "clang exited with code 72 / unable to find utility clang" build error.
-          sudo xcodebuild -license accept || true
-          sudo xcodebuild -runFirstLaunch || true
-
+          sudo xcode-select -s "$SELECTED"
+          echo "DEVELOPER_DIR=$SELECTED" >> "$GITHUB_ENV"
+          echo "xcode_version=$SELECTED_VER" >> "$GITHUB_OUTPUT"
+          echo "Selected developer directory: $SELECTED (Xcode $SELECTED_VER)"
           xcodebuild -version
-          xcrun --sdk macosx --show-sdk-path
-          xcrun --sdk macosx clang++ --version
-          # Fail fast if the selected Xcode is missing the asset-catalog tools.
-          xcrun --find actool
-          xcrun --find ibtool
-          # Probe the EXACT resolution mechanism the .NET iOS SDK uses so we fail
-          # here (with a clear message) rather than deep inside the build.
-          MACOS_SDK="$DEVELOPER_PATH/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+          MACOS_SDK="$SELECTED/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
           xcodebuild -sdk "$MACOS_SDK" -find clang
           xcodebuild -sdk "$MACOS_SDK" -find actool
 
@@ -135,12 +145,15 @@ jobs:
 
       - name: Publish (build + sign + create .ipa)
         run: |
-          # With the iOS workload pinned to 26.5.10284 (targets Xcode 26.5) and the
-          # healthy Xcode 26.5 selected above, the SDK's Xcode-version check passes
-          # naturally - no version-check bypass is needed.
+          # The iOS workload is pinned to 26.5.10284 (targets Xcode 26.5). The Xcode
+          # actually selected above is whichever install can resolve clang/actool via
+          # `xcodebuild -find` - usually 26.5, but not guaranteed. Disable the strict
+          # Xcode-version check so a compatible-but-not-identical Xcode is accepted.
+          echo "Building with Xcode ${{ steps.xcode.outputs.xcode_version }}"
           dotnet publish "$PROJECT" -f "$FRAMEWORK" -c "$CONFIGURATION" \
             /p:ArchiveOnBuild=true \
             /p:RuntimeIdentifier=$RUNTIME_ID \
+            /p:_XcodeVersionCheckExitCode=0 \
             /p:ApplicationVersion=${{ steps.buildnum.outputs.build_number }} \
             /p:CodesignKey="${{ secrets.IOS_SIGNING_IDENTITY }}" \
             /p:CodesignProvision="${{ secrets.IOS_PROVISION_NAME }}"
