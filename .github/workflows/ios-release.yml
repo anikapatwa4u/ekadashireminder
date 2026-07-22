@@ -71,19 +71,30 @@ jobs:
 
       - name: Install MAUI workload (matched to the selected Xcode)
         run: |
-          # If we could not select Xcode 26.6, the auto-updated iOS workload (which
-          # requires 26.6) will not build. In that case roll the iOS workload back to
-          # 26.5.10284, which requires Xcode 26.5 - the known-good combination.
+          # The auto-updated iOS workload (26.5.10301) requires Xcode 26.6. On this runner
+          # the only Xcode 26.6 (Xcode_26.6.0) is a broken/partial install, so we must
+          # build with the healthy Xcode 26.5 instead. That means the workload MUST be
+          # pinned to 26.5.10284 (which targets Xcode 26.5).
+          #
+          # NOTE: `dotnet workload install --from-rollback-file` will NOT downgrade an
+          # already-installed newer workload. We must use `workload update` for that.
           XVER="${{ steps.xcode.outputs.xcode_version }}"
-          if [ "$XVER" != "26.6" ]; then
-            echo "Selected Xcode $XVER (not 26.6) - pinning iOS workload to 26.5.10284."
-            dotnet workload install maui \
-              --from-rollback-file .github/workflows/ios-workload-rollback.json
-          else
-            echo "Selected Xcode 26.6 - installing latest maui workload."
+          echo "Selected Xcode version: $XVER"
+
+          if [ "$XVER" = "26.6" ]; then
+            echo "Xcode 26.6 available - installing latest maui workload."
             dotnet workload install maui
+          else
+            echo "Pinning iOS workload to 26.5.10284 to match Xcode $XVER."
+            # Ensure the maui workload is present, then force it to the pinned versions.
+            dotnet workload install maui
+            dotnet workload update --from-rollback-file .github/workflows/ios-workload-rollback.json
           fi
+
+          echo "===== Installed workloads ====="
           dotnet workload list
+          echo "===== Installed Microsoft.iOS.Sdk packs ====="
+          ls "$HOME/.dotnet/packs" | grep -i "Microsoft.iOS.Sdk" || true
 
       - name: Import signing certificate
         env:

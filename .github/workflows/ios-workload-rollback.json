@@ -1,3 +1,4 @@
 {
-  "microsoft.net.sdk.ios": "26.5.10284/10.0.100"
+  "microsoft.net.sdk.ios": "26.5.10284/10.0.100",
+  "microsoft.net.sdk.maccatalyst": "26.5.10284/10.0.100"
 }
