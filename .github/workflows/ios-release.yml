@@ -15,8 +15,8 @@ jobs:
 
     env:
       PROJECT: EkadashiReminder.csproj
-      # Pin the SDK so its iOS workload does not silently advance to a version
-      # requiring a newer Xcode than the hosted runner provides.
+      # Pin the SDK feature band. The iOS workload itself is installed at its latest
+      # version in the workload step, which targets the healthy Xcode 26.6 on the runner.
       DOTNET_VERSION: '10.0.202'
       CONFIGURATION: Release
       FRAMEWORK: net10.0-ios
@@ -87,17 +87,15 @@ jobs:
 
       - name: Install MAUI workload
         run: |
-          # IMPORTANT: the SDK-band pin (DOTNET_VERSION 10.0.202) is NOT enough. That
-          # workload set resolves the iOS pack to 26.2.10233, which requires Xcode 26.3
-          # - and Xcode 26.3 is a broken/partial install on this runner (missing actool),
-          # so the asset-catalog build fails. The healthy Xcode on the runner is 26.5.
+          # KEY FINDING: the auto-selecting Xcode probe showed that on this runner the
+          # HEALTHY Xcode (the one whose clang/actool resolve via `xcodebuild -find`)
+          # is 26.6 - NOT 26.5. Xcode 26.5's toolchain is the broken one here.
           #
-          # To genuinely match the selected Xcode 26.5 we pin the iOS/MacCatalyst
-          # workload packs to 26.5.10284 (which targets Xcode 26.5) via a rollback file.
-          # `workload install` will not downgrade an already-newer workload, so we then
-          # run `workload update --from-rollback-file` to force the exact versions.
-          dotnet workload install maui --version 10.0.202
-          dotnet workload update --from-rollback-file .github/workflows/ios-workload-rollback.json
+          # Therefore we must use the LATEST iOS workload (26.5.10301), which targets
+          # Xcode 26.6, so the SDK's Xcode-version check passes against the healthy
+          # Xcode 26.6. Do NOT downgrade to 26.5.10284 - that requires the broken
+          # Xcode 26.5 and fails with "requires Xcode 26.5".
+          dotnet workload install maui
           echo "===== Installed workloads ====="
           dotnet workload list
           echo "===== Installed Microsoft.iOS.Sdk packs ====="
@@ -145,15 +143,13 @@ jobs:
 
       - name: Publish (build + sign + create .ipa)
         run: |
-          # The iOS workload is pinned to 26.5.10284 (targets Xcode 26.5). The Xcode
-          # actually selected above is whichever install can resolve clang/actool via
-          # `xcodebuild -find` - usually 26.5, but not guaranteed. Disable the strict
-          # Xcode-version check so a compatible-but-not-identical Xcode is accepted.
+          # The auto-select step picks the Xcode whose clang/actool actually resolve
+          # (26.6 on this runner), and the latest iOS workload (26.5.10301) targets
+          # Xcode 26.6 - so the SDK version check matches naturally.
           echo "Building with Xcode ${{ steps.xcode.outputs.xcode_version }}"
           dotnet publish "$PROJECT" -f "$FRAMEWORK" -c "$CONFIGURATION" \
             /p:ArchiveOnBuild=true \
             /p:RuntimeIdentifier=$RUNTIME_ID \
-            /p:_XcodeVersionCheckExitCode=0 \
             /p:ApplicationVersion=${{ steps.buildnum.outputs.build_number }} \
             /p:CodesignKey="${{ secrets.IOS_SIGNING_IDENTITY }}" \
             /p:CodesignProvision="${{ secrets.IOS_PROVISION_NAME }}"
