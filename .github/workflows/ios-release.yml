@@ -33,15 +33,12 @@ jobs:
 
       - name: Select Xcode 26.5 toolchain
         run: |
-          # Constraint on the macos-26 runner:
-          #   * The pinned iOS workload (26.2.10233) *requires* Xcode 26.3.
-          #   * But the Xcode 26.3 install on the image is INCOMPLETE - its macOS SDK
-          #     and command-line tools (actool/ibtool) are missing, which fails the
-          #     asset-catalog build with: unable to find utility "actool".
-          #   * The only COMPLETE Xcode on the image is 26.5.
-          # So we select the complete Xcode 26.5 here and disable the .NET for iOS
-          # Xcode version check at publish time (see the Publish step) so the pinned
-          # workload accepts it.
+          # Runner reality (macos-26):
+          #   * Xcode 26.5 is the newest COMPLETE install (has macOS SDK + actool/ibtool).
+          #   * Xcode 26.3 and 26.6 are partial installs - their actool/SDK are missing,
+          #     which breaks the asset-catalog compile ("unable to find utility actool").
+          # So we build with Xcode 26.5 and pin the iOS workload to 26.5.10284 (which
+          # targets Xcode 26.5) in the workload step, so the SDK version check matches.
           #
           # xcode-select must receive Contents/Developer, not the .app bundle itself.
           XCODE_APP=$(ls -d /Applications/Xcode_26.5*.app 2>/dev/null | head -n 1)
@@ -66,11 +63,21 @@ jobs:
 
       - name: Install MAUI workload
         run: |
-          # Pin the workload set as well as the SDK. Without --version, the command
-          # downloads the newest iOS workload (currently 26.5.10301), which requires
-          # Xcode 26.6. The 10.0.202 workload set is compatible with Xcode 26.5.
+          # IMPORTANT: the SDK-band pin (DOTNET_VERSION 10.0.202) is NOT enough. That
+          # workload set resolves the iOS pack to 26.2.10233, which requires Xcode 26.3
+          # - and Xcode 26.3 is a broken/partial install on this runner (missing actool),
+          # so the asset-catalog build fails. The healthy Xcode on the runner is 26.5.
+          #
+          # To genuinely match the selected Xcode 26.5 we pin the iOS/MacCatalyst
+          # workload packs to 26.5.10284 (which targets Xcode 26.5) via a rollback file.
+          # `workload install` will not downgrade an already-newer workload, so we then
+          # run `workload update --from-rollback-file` to force the exact versions.
           dotnet workload install maui --version 10.0.202
+          dotnet workload update --from-rollback-file .github/workflows/ios-workload-rollback.json
+          echo "===== Installed workloads ====="
           dotnet workload list
+          echo "===== Installed Microsoft.iOS.Sdk packs ====="
+          ls "$HOME/.dotnet/packs" | grep -i "Microsoft.iOS.Sdk" || true
 
       - name: Import signing certificate
         env:
@@ -114,14 +121,12 @@ jobs:
 
       - name: Publish (build + sign + create .ipa)
         run: |
-          # _XcodeVersionCheckExitCode=0 disables the strict Xcode-version check in
-          # the .NET for iOS SDK. The pinned workload (26.2.10233) nominally requires
-          # Xcode 26.3, but only Xcode 26.5 is complete on the runner; 26.5 is
-          # backward-compatible for building this app.
+          # With the iOS workload pinned to 26.5.10284 (targets Xcode 26.5) and the
+          # healthy Xcode 26.5 selected above, the SDK's Xcode-version check passes
+          # naturally - no version-check bypass is needed.
           dotnet publish "$PROJECT" -f "$FRAMEWORK" -c "$CONFIGURATION" \
             /p:ArchiveOnBuild=true \
             /p:RuntimeIdentifier=$RUNTIME_ID \
-            /p:_XcodeVersionCheckExitCode=0 \
             /p:ApplicationVersion=${{ steps.buildnum.outputs.build_number }} \
             /p:CodesignKey="${{ secrets.IOS_SIGNING_IDENTITY }}" \
             /p:CodesignProvision="${{ secrets.IOS_PROVISION_NAME }}"
