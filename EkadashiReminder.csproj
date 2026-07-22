@@ -50,13 +50,19 @@
     <None Include=".github\workflows\ios-release.yml" />
     <None Include="EkadashiReminder.Tests\EkadashiReminder.Tests.csproj" />
   </ItemGroup>
+  <!-- CI/workflow files under .github must never be bundled into the app. MAUI's
+       implicit globbing was picking them up as BundleResource/Content, which broke
+       the iOS build when a referenced file was removed. Exclude the folder from all
+       packaging item types. -->
+  <ItemGroup>
+    <BundleResource Remove=".github\**" />
+    <Content Remove=".github\**" />
+    <MauiAsset Remove=".github\**" />
+  </ItemGroup>
   <!-- The test project lives in a subfolder; exclude its sources from the MAUI app's
        implicit **/*.cs glob so they are not compiled into the app. -->
   <ItemGroup>
     <Compile Remove="EkadashiReminder.Tests\**\*.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include=".github\workflows\ios-workload-rollback.json" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
