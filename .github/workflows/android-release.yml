@@ -27,7 +27,7 @@ jobs:
       PROJECT: EkadashiReminder.csproj
       DOTNET_VERSION: '10.0.x'
       CONFIGURATION: Release
-      FRAMEWORK: net10.0-android
+      FRAMEWORK: net10.0-android36.0
       PACKAGE_NAME: com.anikapatwa.ekadashireminder
 
     steps:
