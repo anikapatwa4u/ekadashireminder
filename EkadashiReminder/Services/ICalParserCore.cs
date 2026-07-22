@@ -187,6 +187,24 @@ public static class ICalParserCore
         return linked.OrderBy(e => e.Date).ToList();
     }
 
+    /// <summary>
+    /// Returns the upcoming Ekadashi fasting events (on or after <paramref name="today"/>),
+    /// sorted by date. This is the pure logic behind the "Next Ekadashi" featured card.
+    /// Kept deterministic and side-effect-free so the correct next date is always chosen
+    /// regardless of load ordering.
+    /// </summary>
+    public static IReadOnlyList<ParsedIcalEvent> GetUpcoming(
+        IEnumerable<ParsedIcalEvent> events, DateOnly today)
+        => events
+            .Where(e => e.IsEkadashiFast && e.Date >= today)
+            .OrderBy(e => e.Date)
+            .ToList();
+
+    /// <summary>Returns the single next upcoming Ekadashi fasting event, or null when none.</summary>
+    public static ParsedIcalEvent? GetNextUpcoming(
+        IEnumerable<ParsedIcalEvent> events, DateOnly today)
+        => GetUpcoming(events, today).FirstOrDefault();
+
     /// <summary>Unescapes the small set of RFC 5545 text escapes that appear in these files.</summary>
     private static string Unescape(string value)
         => value

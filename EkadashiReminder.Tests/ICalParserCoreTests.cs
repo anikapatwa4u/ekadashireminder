@@ -226,4 +226,77 @@ public class ICalParserCoreTests
         var fast = Assert.Single(ICalParserCore.Parse(calendar));
         Assert.Equal("Fast today, feast tomorrow", fast.Description);
     }
+
+    // ---------------------------------------------------------------------------
+    // 9. "Next Ekadashi" selection — regression tests for the bug where the wrong
+    //    date (e.g. July 25 instead of July 24) was shown on first open due to a
+    //    race between two concurrent location loads. The selection logic itself must
+    //    be deterministic: always the earliest upcoming Ekadashi for the given data.
+    // ---------------------------------------------------------------------------
+    private static ParsedIcalEvent Fast(int year, int month, int day, string name = "Ekadashi")
+        => new(name, new DateOnly(year, month, day), string.Empty, true, false, null);
+
+    [Fact]
+    public void GetNextUpcoming_ReturnsEarliestFutureEkadashi()
+    {
+        var events = new[]
+        {
+            Fast(2026, 7, 24, "Kamika Ekadashi"),
+            Fast(2026, 7, 25, "Some Other Ekadashi"),
+            Fast(2026, 8, 8,  "Pavitropana Ekadashi"),
+        };
+
+        var next = ICalParserCore.GetNextUpcoming(events, new DateOnly(2026, 7, 20));
+
+        Assert.NotNull(next);
+        Assert.Equal(new DateOnly(2026, 7, 24), next!.Date);
+        Assert.Equal("Kamika Ekadashi", next.Name);
+    }
+
+    [Fact]
+    public void GetNextUpcoming_IsOrderIndependent()
+    {
+        // Regardless of the input order (which is what the concurrency race scrambled),
+        // the earliest upcoming date must always be selected.
+        var ordered = new[] { Fast(2026, 7, 24), Fast(2026, 7, 25), Fast(2026, 8, 8) };
+        var shuffled = new[] { Fast(2026, 8, 8), Fast(2026, 7, 25), Fast(2026, 7, 24) };
+
+        var today = new DateOnly(2026, 7, 20);
+        var a = ICalParserCore.GetNextUpcoming(ordered, today);
+        var b = ICalParserCore.GetNextUpcoming(shuffled, today);
+
+        Assert.Equal(a!.Date, b!.Date);
+        Assert.Equal(new DateOnly(2026, 7, 24), a.Date);
+    }
+
+    [Fact]
+    public void GetUpcoming_ExcludesPastDates()
+    {
+        var events = new[]
+        {
+            Fast(2026, 7, 10),  // past
+            Fast(2026, 7, 24),  // future
+            Fast(2026, 8, 8),   // future
+        };
+
+        var upcoming = ICalParserCore.GetUpcoming(events, new DateOnly(2026, 7, 20));
+
+        Assert.Equal(2, upcoming.Count);
+        Assert.DoesNotContain(upcoming, e => e.Date == new DateOnly(2026, 7, 10));
+    }
+
+    [Fact]
+    public void GetUpcoming_IncludesTodayItself()
+    {
+        var events = new[] { Fast(2026, 7, 24) };
+        var upcoming = ICalParserCore.GetUpcoming(events, new DateOnly(2026, 7, 24));
+        Assert.Single(upcoming);
+    }
+
+    [Fact]
+    public void GetNextUpcoming_ReturnsNull_WhenNoFutureEvents()
+    {
+        var events = new[] { Fast(2026, 1, 1) };
+        Assert.Null(ICalParserCore.GetNextUpcoming(events, new DateOnly(2026, 12, 31)));
+    }
 }

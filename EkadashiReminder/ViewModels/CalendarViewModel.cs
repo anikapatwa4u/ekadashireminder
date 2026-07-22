@@ -17,6 +17,12 @@ public class CalendarViewModel : INotifyPropertyChanged
     private string _locationKey = string.Empty;
     private CancellationTokenSource _loadCts = new();
 
+    // When true, property setters must NOT trigger event loads. Used during
+    // InitializeAsync so setting Country/City to restore the saved location does not
+    // kick off a spurious load for the alphabetically-first city, which could race
+    // with (and overwrite) the correct load and show the wrong Ekadashi date.
+    private bool _isInitializing;
+
     // ?? Commands ????????????????????????????????????????????????????????????????
     public ICommand RefreshCommand { get; }
     public ICommand ToggleReminderCommand { get; }
@@ -56,7 +62,7 @@ public class CalendarViewModel : INotifyPropertyChanged
             if (_selectedLocation == value) return;
             _selectedLocation = value;
             OnPropertyChanged();
-            if (value is not null)
+            if (value is not null && !_isInitializing)
             {
                 _loadCts.Cancel();
                 _loadCts = new CancellationTokenSource();
@@ -134,14 +140,26 @@ public class CalendarViewModel : INotifyPropertyChanged
         // Notify Countries picker now that AllCountries lazy value is ready.
         OnPropertyChanged(nameof(Countries));
 
-        // Set country first so cities list populates, then city.
-        _selectedCountry = location.Country;
-        OnPropertyChanged(nameof(SelectedCountry));
-        RefreshCitiesForCountry();
+        // Suppress load-on-set while we restore the saved location, so the
+        // auto-select-first-city logic cannot start a competing load that races
+        // with (and overwrites) the correct one.
+        _isInitializing = true;
+        try
+        {
+            // Set country first so cities list populates, then the exact saved city.
+            _selectedCountry = location.Country;
+            OnPropertyChanged(nameof(SelectedCountry));
+            RefreshCitiesForCountry();
 
-        _selectedLocation = location;
-        OnPropertyChanged(nameof(SelectedLocation));
+            _selectedLocation = location;
+            OnPropertyChanged(nameof(SelectedLocation));
+        }
+        finally
+        {
+            _isInitializing = false;
+        }
 
+        // Now perform the single, authoritative load for the restored location.
         await LoadEventsAsync(location.Key, _loadCts.Token, scheduleReminders: true);
     }
 
