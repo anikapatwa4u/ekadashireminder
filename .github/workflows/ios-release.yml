@@ -47,12 +47,8 @@ jobs:
           echo "Installed Xcodes:"
           ls -d /Applications/Xcode*.app 2>/dev/null || true
 
-          # Every command-line tool the iOS build/link/dSYM pipeline resolves. Some
-          # Xcodes on this runner (e.g. 26.6.0) are PARTIAL installs that resolve some
-          # tools but not others, and `xcrun --find` vs `xcodebuild -find` can disagree
-          # for the same Xcode. So an Xcode is only accepted if EVERY tool below is
-          # resolvable via BOTH mechanisms - otherwise we fall through to the next one.
-          REQUIRED_TOOLS="clang clang++ actool ibtool dsymutil ld strip lipo bitcode_strip install_name_tool codesign_allocate nm"
+          # Every command-line tool the iOS build/link/dSYM pipeline resolves.
+          REQUIRED_TOOLS="clang clang++ actool ibtool dsymutil ld strip lipo bitcode_strip install_name_tool codesign_allocate nm mdimport"
 
           SELECTED=""
           SELECTED_VER=""
@@ -66,25 +62,44 @@ jobs:
             if [ ! -d "$SDK" ]; then
               echo "  skip: macOS SDK missing"; continue
             fi
+
+            # ROOT-CAUSE FIX: on this runner some Xcodes (e.g. Xcode_26.6.0.app) are
+            # PARTIAL installs. Their `xcrun` silently falls back to resolving tools
+            # inside a DIFFERENT Xcode (Xcode_26.6.app) for tools they have, but they
+            # are missing others (mdimport, ...). The build runs with THIS Xcode's
+            # DEVELOPER_DIR, so those missing tools fail mid-build.
+            #
+            # A truly usable Xcode must be SELF-CONTAINED: every required tool must
+            # resolve to a path INSIDE its own Developer dir (not a sibling Xcode) via
+            # BOTH xcrun and xcodebuild -find. This rejects the partial installs and
+            # selects the complete one.
+            REAL_XC=$(cd "$XC" && pwd -P)   # resolve symlink aliases to the real app
             OK=1
             for TOOL in $REQUIRED_TOOLS; do
-              if ! DEVELOPER_DIR="$DEV" xcrun --find "$TOOL" >/dev/null 2>&1 \
-                 || ! DEVELOPER_DIR="$DEV" xcodebuild -sdk "$SDK" -find "$TOOL" >/dev/null 2>&1; then
-                echo "  skip: tool '$TOOL' not resolvable via both xcrun and xcodebuild -find"
-                OK=0
-                break
+              P=$(DEVELOPER_DIR="$DEV" xcrun --find "$TOOL" 2>/dev/null)
+              if [ -z "$P" ]; then
+                echo "  skip: tool '$TOOL' not resolvable via xcrun"; OK=0; break
               fi
+              if ! DEVELOPER_DIR="$DEV" xcodebuild -sdk "$SDK" -find "$TOOL" >/dev/null 2>&1; then
+                echo "  skip: tool '$TOOL' not resolvable via xcodebuild -find"; OK=0; break
+              fi
+              # Ensure the tool lives inside THIS Xcode, not a fallback sibling.
+              RP=$(cd "$(dirname "$P")" && pwd -P)
+              case "$RP" in
+                "$REAL_XC"/*) : ;;  # inside this Xcode - good
+                *) echo "  skip: tool '$TOOL' resolves OUTSIDE this Xcode ($P) - partial install"; OK=0; break ;;
+              esac
             done
             if [ "$OK" = "1" ]; then
               SELECTED="$DEV"
               SELECTED_VER=$(DEVELOPER_DIR="$DEV" xcodebuild -version | head -n 1 | awk '{print $2}')
-              echo "  -> USABLE (all required tools resolve via BOTH xcodebuild and xcrun). Version $SELECTED_VER"
+              echo "  -> USABLE (all required tools resolve INSIDE this Xcode). Version $SELECTED_VER"
               break
             fi
           done
 
           if [ -z "$SELECTED" ]; then
-            echo "No Xcode on this runner can resolve the full iOS build toolchain ($REQUIRED_TOOLS)." >&2
+            echo "No self-contained Xcode on this runner resolves the full iOS toolchain ($REQUIRED_TOOLS)." >&2
             exit 1
           fi
 
@@ -93,7 +108,6 @@ jobs:
           echo "xcode_version=$SELECTED_VER" >> "$GITHUB_OUTPUT"
           echo "Selected developer directory: $SELECTED (Xcode $SELECTED_VER)"
           xcodebuild -version
-          MACOS_SDK="$SELECTED/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
           echo "Final tool resolution check:"
           for TOOL in $REQUIRED_TOOLS; do
             echo "  $TOOL -> $(xcrun --find "$TOOL")"
