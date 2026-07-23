@@ -83,11 +83,18 @@ jobs:
               if ! DEVELOPER_DIR="$DEV" xcodebuild -sdk "$SDK" -find "$TOOL" >/dev/null 2>&1; then
                 echo "  skip: tool '$TOOL' not resolvable via xcodebuild -find"; OK=0; break
               fi
-              # Ensure the tool lives inside THIS Xcode, not a fallback sibling.
+              # Reject only if the tool resolves inside a DIFFERENT Xcode.app (the
+              # partial-install fallback we are trying to avoid). Tools that live in
+              # shared system locations (e.g. /usr/bin/mdimport) are legitimate and
+              # must NOT be treated as "outside this Xcode".
               RP=$(cd "$(dirname "$P")" && pwd -P)
               case "$RP" in
-                "$REAL_XC"/*) : ;;  # inside this Xcode - good
-                *) echo "  skip: tool '$TOOL' resolves OUTSIDE this Xcode ($P) - partial install"; OK=0; break ;;
+                "$REAL_XC"/*)
+                  : ;;  # inside this Xcode - good
+                /Applications/Xcode*.app/*)
+                  echo "  skip: tool '$TOOL' resolves into a DIFFERENT Xcode ($P) - partial install"; OK=0; break ;;
+                *)
+                  : ;;  # system path (e.g. /usr/bin) - legitimate
               esac
             done
             if [ "$OK" = "1" ]; then
